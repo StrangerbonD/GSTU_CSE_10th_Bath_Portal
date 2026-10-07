@@ -81,6 +81,7 @@ export default function Navbar({ initialUser = null }) {
               ...refreshed.user,
               image: avatar,
               avatarUrl: avatar,
+              avatarVersion: Date.now(),
             };
             localStorage.setItem("auth_user", JSON.stringify(normalizedUser));
             authService.saveUserMinCookie(normalizedUser);

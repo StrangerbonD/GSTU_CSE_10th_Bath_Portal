@@ -113,6 +113,7 @@ export default function DashboardClient({ initialUser = null, initialThought = n
               ...refreshed.user,
               image: avatar,
               avatarUrl: avatar,
+              avatarVersion: Date.now(),
             };
             localStorage.setItem("auth_user", JSON.stringify(normalized));
             authService.saveUserMinCookie(normalized);

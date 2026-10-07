@@ -62,6 +62,7 @@ export const authService = {
             ...data.user,
             image: avatar,
             avatarUrl: avatar,
+            avatarVersion: Date.now(),
           };
           localStorage.setItem("auth_user", JSON.stringify(normalizedUser));
           if (normalizedUser.role) {

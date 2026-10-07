@@ -139,7 +139,15 @@ export default function VerifyEmailForm() {
       // ভেরিফাই সম্পন্ন হলে টোকেন এবং ইউজার ইনফো সেভ হবে
       if (result.token && result.user) {
         setAccessToken(result.token);
-        localStorage.setItem("auth_user", JSON.stringify(result.user));
+        const avatar = result.user?.avatarUrl || result.user?.image || null;
+        const normalizedUser = {
+          ...result.user,
+          image: avatar,
+          avatarUrl: avatar,
+          avatarVersion: Date.now(),
+        };
+        localStorage.setItem("auth_user", JSON.stringify(normalizedUser));
+        authService.saveUserMinCookie?.(normalizedUser);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("auth_user_updated"));
         }

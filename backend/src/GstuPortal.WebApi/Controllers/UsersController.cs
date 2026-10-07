@@ -27,10 +27,13 @@ public class UsersController : BaseApiController
 
     [AllowAnonymous]
     [HttpGet("{id:guid}/avatar")]
-    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Any)]
+    [HttpHead("{id:guid}/avatar")]
     public async Task<IActionResult> GetUserAvatar(Guid id)
     {
         Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+        Response.Headers["Pragma"] = "no-cache";
+        Response.Headers["Expires"] = "0";
 
         var result = await Mediator.Send(new GstuPortal.Application.Features.Users.Queries.GetUserById.GetUserByIdQuery(id));
         if (result == null || string.IsNullOrWhiteSpace(result.AvatarUrl))
@@ -52,8 +55,8 @@ public class UsersController : BaseApiController
                 var allowedMimeTypes = new[] { "image/jpeg", "image/png", "image/webp", "image/jpg" };
                 if (allowedMimeTypes.Contains(mimeType))
                 {
-                    // Size limit: Max ~1.5MB base64
-                    if (base64.Length <= 1_500_000)
+                    // Size limit: Max ~10MB base64
+                    if (base64.Length <= 10_000_000)
                     {
                         try
                         {
@@ -69,8 +72,8 @@ public class UsersController : BaseApiController
             }
         }
 
-        if (result.AvatarUrl.StartsWith("https://images.unsplash.com/", StringComparison.OrdinalIgnoreCase) ||
-            result.AvatarUrl.StartsWith("https://ui-avatars.com/", StringComparison.OrdinalIgnoreCase))
+        if (Uri.TryCreate(result.AvatarUrl, UriKind.Absolute, out var parsedUri) &&
+            (parsedUri.Scheme == Uri.UriSchemeHttp || parsedUri.Scheme == Uri.UriSchemeHttps))
         {
             return Redirect(result.AvatarUrl);
         }

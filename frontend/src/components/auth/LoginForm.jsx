@@ -32,7 +32,15 @@ export default function LoginForm() {
 
       if (data.token) {
         setAccessToken(data.token);
-        localStorage.setItem("auth_user", JSON.stringify(data.user));
+        const avatar = data.user?.avatarUrl || data.user?.image || null;
+        const normalizedUser = {
+          ...data.user,
+          image: avatar,
+          avatarUrl: avatar,
+          avatarVersion: Date.now(),
+        };
+        localStorage.setItem("auth_user", JSON.stringify(normalizedUser));
+        authService.saveUserMinCookie?.(normalizedUser);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("auth_user_updated"));
         }

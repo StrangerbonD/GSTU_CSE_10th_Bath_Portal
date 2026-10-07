@@ -13,16 +13,30 @@ export function getUserAvatar(u) {
   if (!u) {
     return "https://ui-avatars.com/api/?name=User&background=0e3b2e&color=fff";
   }
+
+  // 1. Direct Base64 Data URL (Fastest, instant rendering, zero network delay)
+  const candidate = u.avatarUrl || u.image;
+  if (candidate && typeof candidate === "string" && candidate.trim() !== "") {
+    const trimmed = candidate.trim();
+    if (trimmed.startsWith("data:image/")) {
+      return trimmed;
+    }
+    // Direct external image URLs (ImgBB, Unsplash, Cloudinary, etc.)
+    if (
+      (trimmed.startsWith("http://") || trimmed.startsWith("https://")) &&
+      !trimmed.includes("photo-1535713875002") &&
+      !trimmed.includes("/api/users/")
+    ) {
+      return trimmed;
+    }
+  }
+
+  // 2. Backend hosted / avatar proxy with cache-busting
   if (u.id) {
-    const v = u.avatarVersion ? `?v=${u.avatarVersion}` : "";
-    return `${API_BASE_URL}/api/users/${u.id}/avatar${v}`;
+    const v = u.avatarVersion || (u.updatedAt ? new Date(u.updatedAt).getTime() : Date.now());
+    return `${API_BASE_URL}/api/users/${u.id}/avatar?v=${v}`;
   }
-  if (u.image && !u.image.includes("photo-1535713875002")) {
-    return u.image;
-  }
-  if (u.avatarUrl && !u.avatarUrl.includes("photo-1535713875002")) {
-    return u.avatarUrl;
-  }
+
   const name = u.fullName || u.userName || "User";
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0e3b2e&color=fff`;
 }
