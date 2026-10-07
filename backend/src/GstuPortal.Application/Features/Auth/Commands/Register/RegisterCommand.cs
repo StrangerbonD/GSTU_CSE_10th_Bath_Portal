@@ -64,7 +64,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
             existingUser.ChangePassword(newPasswordHash);
 
             var newOtp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-            existingUser.SetVerificationOtp(newOtp, DateTime.UtcNow.AddMinutes(15));
+            existingUser.SetVerificationOtp(newOtp, DateTime.UtcNow.AddMinutes(5));
             await _context.SaveChangesAsync(cancellationToken);
 
             _ = Task.Run(async () =>
@@ -91,9 +91,9 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
             role: UserRole.User,
             studentId: request.StudentId);
 
-        // Generate 6-digit verification OTP (valid for 15 minutes)
+        // Generate 6-digit verification OTP (valid for 5 minutes)
         var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-        user.SetVerificationOtp(otp, DateTime.UtcNow.AddMinutes(15));
+        user.SetVerificationOtp(otp, DateTime.UtcNow.AddMinutes(5));
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync(cancellationToken);

@@ -47,9 +47,9 @@ public class ResendOtpCommandHandler : IRequestHandler<ResendOtpCommand, ResendO
             }
         }
 
-        // Generate cryptographic 6-digit OTP (valid for 15 minutes)
+        // Generate cryptographic 6-digit OTP (valid for 5 minutes)
         var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-        var expiresAt = DateTime.UtcNow.AddMinutes(15);
+        var expiresAt = DateTime.UtcNow.AddMinutes(5);
 
         user.SetVerificationOtp(otp, expiresAt);
         await _context.SaveChangesAsync(cancellationToken);

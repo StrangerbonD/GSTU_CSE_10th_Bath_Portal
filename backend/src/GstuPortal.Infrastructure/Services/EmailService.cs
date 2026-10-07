@@ -46,7 +46,7 @@ public class EmailService : IEmailService
         Subject: GSTU CSE 10th Batch - Email Verification Code
         ----------------------------------------------------------------------
         Your 6-Digit Verification Code (OTP) is: [ {Otp} ]
-        (This code will expire in 15 minutes)
+        (This code will expire in 5 minutes)
         ======================================================================
 
         """, toEmail, fullName, otp);
@@ -66,15 +66,15 @@ public class EmailService : IEmailService
                 Don't share this code with anyone.
             </p>
             <p style="color: #64748b; font-size: 13px; margin-top: 2px; margin-bottom: 28px;">
-                (This code will expire in 15 minutes)
+                (This code will expire in 5 minutes)
             </p>
             
             <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
             
             <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 0;">
                 Best regards,<br/>
-                <strong>GSTU CSE 10th Batch</strong><br/>
-                <span style="color: #64748b; font-size: 12px;">Department of Computer Science & Engineering</span>
+                <strong>Bondhon</strong><br/>
+                <span style="color: #64748b; font-size: 12px;">Admin, GSTU CSE 10<sup>th</sup> Batch</span>
             </p>
         </div>
         """;
