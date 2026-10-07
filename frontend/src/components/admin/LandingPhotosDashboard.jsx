@@ -22,6 +22,7 @@ export default function LandingPhotosDashboard({ onPhotosUpdated }) {
     displayOrder: 1,
     isActive: true,
   });
+  const [previewError, setPreviewError] = useState(false);
 
   const showFeedback = (type, message) => {
     setFeedback({ type, message });
@@ -50,6 +51,7 @@ export default function LandingPhotosDashboard({ onPhotosUpdated }) {
 
   const handleOpenAdd = () => {
     setEditingPhoto(null);
+    setPreviewError(false);
     setFormData({
       imageUrl: "",
       title: "GSTU CSE 10th Batch Family",
@@ -63,6 +65,7 @@ export default function LandingPhotosDashboard({ onPhotosUpdated }) {
 
   const handleOpenEdit = (photo) => {
     setEditingPhoto(photo);
+    setPreviewError(false);
     setFormData({
       imageUrl: photo.imageUrl || "",
       title: photo.title || "",
@@ -77,6 +80,7 @@ export default function LandingPhotosDashboard({ onPhotosUpdated }) {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingPhoto(null);
+    setPreviewError(false);
   };
 
   const handleSubmit = async (e) => {
@@ -350,12 +354,20 @@ export default function LandingPhotosDashboard({ onPhotosUpdated }) {
                   required
                   placeholder="e.g. /images/landing/group-photo.jpg or https://..."
                   value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, imageUrl: e.target.value });
+                    setPreviewError(false);
+                  }}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-[#0e3b2e] focus:ring-2 focus:ring-emerald-700/15"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
-                  You can use local files inside public/images (e.g. /images/landing/group-photo.jpg) or valid external image URLs.
+                  You can use local files (e.g. /images/landing/group-photo.jpg) or valid direct image URLs.
                 </p>
+                {formData.imageUrl.includes("ibb.co") && !formData.imageUrl.includes("i.ibb.co") && (
+                  <p className="text-[11px] text-amber-600 mt-1 font-semibold">
+                    💡 Tip: ImgBB এর ওয়েবপেজ লিংক নয়, Embed codes &gt; &quot;Direct links&quot; অপশন থেকে (যেমন: https://i.ibb.co.com/...jpg) লিংক কপি করুন।
+                  </p>
+                )}
               </div>
 
               {/* Live Preview */}
@@ -364,21 +376,38 @@ export default function LandingPhotosDashboard({ onPhotosUpdated }) {
                   <span className="block text-[11px] font-bold text-slate-600 mb-1">
                     Live Preview
                   </span>
-                  <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 bg-slate-950">
+                  <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 bg-slate-950 flex items-center justify-center">
                     <img
                       src={formData.imageUrl}
                       alt="Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = "none";
+                      className={`w-full h-full object-cover ${previewError ? "hidden" : "block"}`}
+                      onError={() => {
+                        setPreviewError(true);
                       }}
-                      onLoad={(e) => {
-                        e.target.style.display = "block";
+                      onLoad={() => {
+                        setPreviewError(false);
                       }}
                     />
-                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/75 text-[10px] font-bold text-white">
-                      {formData.badgeText || "Memories Forever"}
-                    </div>
+
+                    {previewError && (
+                      <div className="p-4 text-center z-10">
+                        <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-sm">
+                          ✕
+                        </div>
+                        <p className="text-xs font-bold text-rose-300">ছবি লোড করা যায়নি</p>
+                        <p className="text-[11px] text-slate-300 mt-1 max-w-xs leading-relaxed">
+                          {formData.imageUrl.includes("ibb.co")
+                            ? "এটি ImgBB এর ওয়েবপেজ লিংক। দয়া করে Direct Image Link দিন (যা .jpg বা .png দিয়ে শেষ হয়)।"
+                            : "একটি সঠিক ডিরেক্ট ছবি লিঙ্ক (.jpg, .png) প্রদান করুন।"}
+                        </p>
+                      </div>
+                    )}
+
+                    {!previewError && (
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/75 text-[10px] font-bold text-white">
+                        {formData.badgeText || "Memories Forever"}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
