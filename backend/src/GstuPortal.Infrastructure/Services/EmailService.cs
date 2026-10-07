@@ -1,0 +1,106 @@
+using System.Net;
+using System.Net.Mail;
+using GstuPortal.Application.Common.Interfaces;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+namespace GstuPortal.Infrastructure.Services;
+
+public class EmailService : IEmailService
+{
+    private readonly ILogger<EmailService> _logger;
+    private readonly IConfiguration _configuration;
+
+    public EmailService(ILogger<EmailService> logger, IConfiguration configuration)
+    {
+        _logger = logger;
+        _configuration = configuration;
+    }
+
+    public async Task SendOtpEmailAsync(string toEmail, string fullName, string otp, CancellationToken cancellationToken = default)
+    {
+        // 1. Log OTP to server console only in Development environment for testing
+        var isDev = string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Development", StringComparison.OrdinalIgnoreCase);
+        if (isDev)
+        {
+            _logger.LogInformation("""
+
+            ======================================================================
+            ✉️  [GSTU PORTAL EMAIL SERVICE - DEV CONSOLE]
+            To: {Email} ({FullName})
+            Subject: GSTU CSE 10th Batch - Email Verification Code
+            ----------------------------------------------------------------------
+            Your 6-Digit Verification Code (OTP) is: [ {Otp} ]
+            (This code will expire in 5 minutes)
+            ======================================================================
+
+            """, toEmail, fullName, otp);
+        }
+
+        // 2. If SMTP configuration exists, send actual email
+        var smtpHost = Environment.GetEnvironmentVariable("SMTP_HOST") ?? _configuration["EmailSettings:SmtpHost"];
+        var smtpPort = int.TryParse(Environment.GetEnvironmentVariable("SMTP_PORT") ?? _configuration["EmailSettings:SmtpPort"], out var p) ? p : 587;
+        var smtpUser = Environment.GetEnvironmentVariable("SMTP_USER") ?? _configuration["EmailSettings:SmtpUser"];
+        var smtpPass = Environment.GetEnvironmentVariable("SMTP_PASS") ?? _configuration["EmailSettings:SmtpPass"];
+        var fromEmail = Environment.GetEnvironmentVariable("FROM_EMAIL") ?? _configuration["EmailSettings:FromEmail"] ?? "no-reply@gstu.ac.bd";
+
+        if (!string.IsNullOrWhiteSpace(smtpHost) && !string.IsNullOrWhiteSpace(smtpUser))
+        {
+            try
+            {
+                var cleanPass = smtpPass?.Replace(" ", "").Trim() ?? string.Empty;
+                using var client = new SmtpClient(smtpHost, smtpPort)
+                {
+                    Credentials = new NetworkCredential(smtpUser.Trim(), cleanPass),
+                    EnableSsl = true,
+                    DeliveryMethod = SmtpDeliveryMethod.Network,
+                    Timeout = 15000
+                };
+
+                var safeFullName = WebUtility.HtmlEncode(fullName);
+                var fromAddress = new MailAddress(fromEmail.Trim(), "GSTU CSE 10th Batch Portal");
+                var toAddress = new MailAddress(toEmail.Trim(), fullName);
+
+                var message = new MailMessage(fromAddress, toAddress)
+                {
+                    Subject = "GSTU CSE 10th Batch - Email Verification Code",
+                    Body = $"""
+                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+                        <h2 style="color: #0e3b2e; font-size: 22px; font-weight: 800; margin-top: 0; margin-bottom: 16px; letter-spacing: -0.5px;">Welcome to GSTU CSE 10th Batch Portal</h2>
+                        <p style="color: #1e293b; font-size: 15px; margin-bottom: 12px;">Hello <strong>{safeFullName}</strong>,</p>
+                        <p style="color: #475569; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">Please use the following 6-digit verification code to complete your email verification:</p>
+                        
+                        <div style="background-color: #f0fdf4; border: 1px dashed #16a34a; border-radius: 12px; padding: 20px; text-align: center; margin: 20px 0;">
+                            <span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #166534; display: inline-block;">{otp}</span>
+                        </div>
+                        
+                        <p style="color: #dc2626; font-size: 13px; font-weight: 700; margin-bottom: 6px;">
+                            Don't share this code with anyone.
+                        </p>
+                        <p style="color: #64748b; font-size: 13px; margin-top: 2px; margin-bottom: 28px;">
+                            (This code will expire in 5 minutes)
+                        </p>
+                        
+                        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+                        
+                        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 0;">
+                            Best regards,<br/>
+                            <strong>Bondhon</strong><br/>
+                            <span style="color: #64748b; font-size: 12px;">GSTU CSE 10th Batch</span>
+                        </p>
+                    </div>
+                    """,
+                    IsBodyHtml = true,
+                    Priority = MailPriority.High
+                };
+
+                await client.SendMailAsync(message, cancellationToken);
+                _logger.LogInformation("Verification email dispatched successfully via SMTP to {Email}", toEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Failed to send email via SMTP ({Message}). OTP is displayed in server console above.", ex.Message);
+            }
+        }
+    }
+}

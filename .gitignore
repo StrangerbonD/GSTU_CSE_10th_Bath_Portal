@@ -1,0 +1,48 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Secrets & Local Configurations
+appsettings.Development.json
+appsettings.*.local.json
+secrets.json
+*.local
+.env
+.env*.local
+*.pem
+*.key
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Files
+Thumbs.db
+[Dd]esktop.ini
+.DS_Store
+
+# Scratch / Local test artifacts
+*.log
+scratch/
+check_user.sql
+get_users.sql

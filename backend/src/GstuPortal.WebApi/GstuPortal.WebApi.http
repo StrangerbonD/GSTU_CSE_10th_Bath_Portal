@@ -1,0 +1,6 @@
+@GstuPortal.WebApi_HostAddress = http://localhost:5128
+
+GET {{GstuPortal.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

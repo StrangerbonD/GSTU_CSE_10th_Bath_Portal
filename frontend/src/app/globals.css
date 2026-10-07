@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/caveat_normal_700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/eb_garamond_italic_400_700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/eb_garamond_normal_400_700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Pinyon Script';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/pinyon_script_normal_400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'UnifrakturCook';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/unifrakturcook_normal_700.woff2') format('woff2');
+}
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* Certificate Typography */
+.font-gothic {
+  font-family: 'UnifrakturCook', "Old English Text MT", "Engravers Old English BT", "Cloister Black", serif;
+  letter-spacing: 0.005em;
+}
+
+.font-script {
+  font-family: 'Pinyon Script', "Brush Script MT", "Apple Chancery", "Edwardian Script ITC", serif;
+}
+
+.font-handwritten {
+  font-family: 'Caveat', "Segoe Print", "Bradley Hand", cursive, sans-serif;
+}
+
+.font-cert-serif {
+  font-family: 'EB Garamond', Georgia, "Times New Roman", serif;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .transcript-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .certificate-sheet {
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    transform: none !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    height: 296mm !important;
+    max-height: 296mm !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    overflow: hidden !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .certificate-sheet,
+  .certificate-sheet * {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .semester-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    page-break-inside: avoid;
+  }
+
+  .semester-card {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #000000 !important;
+    background: #ffffff !important;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  table {
+    font-size: 8pt !important;
+  }
+
+  th, td {
+    padding: 2px 4px !important;
+  }
+}
+
