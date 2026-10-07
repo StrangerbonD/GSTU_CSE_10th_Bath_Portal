@@ -67,19 +67,18 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
             existingUser.SetVerificationOtp(newOtp, DateTime.UtcNow.AddMinutes(5));
             await _context.SaveChangesAsync(cancellationToken);
 
-            _ = Task.Run(async () =>
+            var emailSent = false;
+            try
             {
-                try
-                {
-                    await _emailService.SendOtpEmailAsync(existingUser.Email, existingUser.FullName, newOtp, CancellationToken.None);
-                }
-                catch
-                {
-                    // Handled inside EmailService
-                }
-            });
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                emailSent = await _emailService.SendOtpEmailAsync(existingUser.Email, existingUser.FullName, newOtp, cts.Token);
+            }
+            catch
+            {
+                emailSent = false;
+            }
 
-            return new AuthResponseDto(string.Empty, string.Empty, existingUser.ToDto(), !_emailService.IsConfigured ? newOtp : null);
+            return new AuthResponseDto(string.Empty, string.Empty, existingUser.ToDto(), !emailSent ? newOtp : null);
         }
 
         var passwordHash = _passwordHasher.HashPassword(request.Password);
@@ -98,22 +97,21 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
         _context.Users.Add(user);
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Send OTP email in the background so registration responds immediately
-        _ = Task.Run(async () =>
+        // Send OTP email with fallback if email provider fails
+        var isDispatched = false;
+        try
         {
-            try
-            {
-                await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otp, CancellationToken.None);
-            }
-            catch
-            {
-                // Handled inside EmailService
-            }
-        });
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            isDispatched = await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otp, cts.Token);
+        }
+        catch
+        {
+            isDispatched = false;
+        }
 
         var userDto = user.ToDto();
 
-        // If email service is not yet configured, provide OTP as fallback so users are not blocked
-        return new AuthResponseDto(string.Empty, string.Empty, userDto, !_emailService.IsConfigured ? otp : null);
+        // If email dispatch was not successful, provide OTP as fallback so users are not locked out
+        return new AuthResponseDto(string.Empty, string.Empty, userDto, !isDispatched ? otp : null);
     }
 }

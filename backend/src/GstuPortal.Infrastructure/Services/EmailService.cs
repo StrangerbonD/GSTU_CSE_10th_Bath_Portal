@@ -35,7 +35,7 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendOtpEmailAsync(string toEmail, string fullName, string otp, CancellationToken cancellationToken = default)
+    public async Task<bool> SendOtpEmailAsync(string toEmail, string fullName, string otp, CancellationToken cancellationToken = default)
     {
         // 1. Always log OTP to server console so the admin/user can always find it in Render logs
         _logger.LogInformation("""
@@ -104,7 +104,7 @@ public class EmailService : IEmailService
                 if (res.IsSuccessStatusCode)
                 {
                     _logger.LogInformation("Verification email dispatched successfully via Brevo API to {Email}", toEmail);
-                    return;
+                    return true;
                 }
                 else
                 {
@@ -126,7 +126,11 @@ public class EmailService : IEmailService
             {
                 using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
                 httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resendApiKey.Trim());
-                var resendFrom = Environment.GetEnvironmentVariable("RESEND_FROM") ?? "GSTU CSE 10th Batch Portal <onboarding@resend.dev>";
+                var rawResendFrom = Environment.GetEnvironmentVariable("RESEND_FROM") ?? _configuration["EmailSettings:ResendFrom"];
+                var resendFrom = (!string.IsNullOrWhiteSpace(rawResendFrom) && !rawResendFrom.Contains("@gmail.com", StringComparison.OrdinalIgnoreCase))
+                    ? rawResendFrom.Trim()
+                    : "GSTU CSE 10th Batch Portal <onboarding@resend.dev>";
+
                 var payload = new
                 {
                     from = resendFrom,
@@ -139,7 +143,7 @@ public class EmailService : IEmailService
                 if (res.IsSuccessStatusCode)
                 {
                     _logger.LogInformation("Verification email dispatched successfully via Resend API to {Email}", toEmail);
-                    return;
+                    return true;
                 }
                 else
                 {
@@ -189,11 +193,14 @@ public class EmailService : IEmailService
 
                 await client.SendMailAsync(message, cts.Token);
                 _logger.LogInformation("Verification email dispatched successfully via SMTP to {Email}", toEmail);
+                return true;
             }
             catch (Exception ex)
             {
                 _logger.LogWarning("SMTP delivery attempt concluded ({Message}). OTP is recorded in server logs above.", ex.Message);
             }
         }
+
+        return false;
     }
 }

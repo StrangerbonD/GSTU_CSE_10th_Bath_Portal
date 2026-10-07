@@ -62,7 +62,7 @@ export default function RegisterForm() {
       }
 
       if (typeof window !== "undefined") {
-        const expiryTime = Date.now() + 60 * 1000;
+        const expiryTime = Date.now() + 5 * 60 * 1000;
         localStorage.setItem("pending_verify_email", email.trim());
         localStorage.setItem(`otp_expires_at_${email.trim().toLowerCase()}`, expiryTime.toString());
         if (res.otp) {

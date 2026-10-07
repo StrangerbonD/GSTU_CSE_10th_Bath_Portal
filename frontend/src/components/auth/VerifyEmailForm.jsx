@@ -18,7 +18,8 @@ export default function VerifyEmailForm() {
   const [successMessage, setSuccessMessage] = useState("");
   const [resendMessage, setResendMessage] = useState("");
   const [targetTimestamp, setTargetTimestamp] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(300); // Countdown in seconds
+  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes OTP countdown (in seconds)
+  const [resendCooldown, setResendCooldown] = useState(60); // 60s cooldown for resend button
 
   useEffect(() => {
     // 1. URL search parameter থেকে ইমেইল নেওয়া
@@ -48,8 +49,10 @@ export default function VerifyEmailForm() {
 
     const normalizedEmail = email.trim().toLowerCase();
     const storageKey = `otp_expires_at_${normalizedEmail}`;
+    const cooldownKey = `resend_cooldown_${normalizedEmail}`;
 
     let target = null;
+    let cooldownTarget = null;
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
@@ -59,10 +62,24 @@ export default function VerifyEmailForm() {
         }
       }
 
-      // যদি পূর্বে টাইম সেভ করা না থাকে, তবে ৬০ সেকেন্ডের নতুন এক্সপায়ারি সেভ হবে
+      const storedCooldown = localStorage.getItem(cooldownKey);
+      if (storedCooldown) {
+        const parsedCd = parseInt(storedCooldown, 10);
+        if (!isNaN(parsedCd) && parsedCd > 0) {
+          cooldownTarget = parsedCd;
+        }
+      }
+
+      // যদি পূর্বে টাইম সেভ করা না থাকে, তবে ৫ মিনিটের (৩০০ সেকেন্ড) নতুন এক্সপায়ারি সেভ হবে
       if (!target) {
-        target = Date.now() + 60 * 1000;
+        target = Date.now() + 5 * 60 * 1000;
         localStorage.setItem(storageKey, target.toString());
+      }
+
+      // রিসেন্ডের জন্য ৬০ সেকেন্ডের কুলডাউন
+      if (!cooldownTarget) {
+        cooldownTarget = Date.now() + 60 * 1000;
+        localStorage.setItem(cooldownKey, cooldownTarget.toString());
       }
     }
 
@@ -70,6 +87,11 @@ export default function VerifyEmailForm() {
       setTargetTimestamp(target);
       const remaining = Math.max(0, Math.ceil((target - Date.now()) / 1000));
       setTimeLeft(remaining);
+    }
+
+    if (cooldownTarget) {
+      const cdRemaining = Math.max(0, Math.ceil((cooldownTarget - Date.now()) / 1000));
+      setResendCooldown(cdRemaining);
     }
   }, [email]);
 
@@ -95,6 +117,23 @@ export default function VerifyEmailForm() {
 
     return () => clearInterval(timer);
   }, [targetTimestamp]);
+
+  // রিসেন্ড বাটন কুলডাউন টাইমার
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const formatTimer = (seconds) => {
     if (seconds <= 0) return "0:00";
@@ -163,6 +202,7 @@ export default function VerifyEmailForm() {
         localStorage.removeItem("pending_verify_otp");
         if (email) {
           localStorage.removeItem(`otp_expires_at_${email.trim().toLowerCase()}`);
+          localStorage.removeItem(`resend_cooldown_${email.trim().toLowerCase()}`);
         }
       }
 
@@ -190,8 +230,8 @@ export default function VerifyEmailForm() {
       return;
     }
 
-    if (timeLeft > 0) {
-      setErrorMessage(`Please wait ${formatTimer(timeLeft)} before requesting a new code.`);
+    if (resendCooldown > 0) {
+      setErrorMessage(`Please wait ${formatTimer(resendCooldown)} before requesting a new code.`);
       return;
     }
 
@@ -212,14 +252,17 @@ export default function VerifyEmailForm() {
 
       setResendMessage(result.message || "A new 6-digit verification code has been sent!");
       
-      // নতুন কোড পাঠালে নতুন ৬০ সেকেন্ডের timestamp সংরক্ষণ ও টাইমার রিসেট করা
-      const newExpiry = Date.now() + 60 * 1000;
+      // নতুন কোড পাঠালে নতুন ৫ মিনিটের (৩০০ সেকেন্ড) timestamp সংরক্ষণ ও টাইমার রিসেট করা
+      const newExpiry = Date.now() + 5 * 60 * 1000;
+      const newCooldown = Date.now() + 60 * 1000;
       if (typeof window !== "undefined") {
         const normalizedEmail = email.trim().toLowerCase();
         localStorage.setItem(`otp_expires_at_${normalizedEmail}`, newExpiry.toString());
+        localStorage.setItem(`resend_cooldown_${normalizedEmail}`, newCooldown.toString());
       }
       setTargetTimestamp(newExpiry);
-      setTimeLeft(60);
+      setTimeLeft(300);
+      setResendCooldown(60);
 
       setTimeout(() => setResendMessage(""), 5000);
     } catch (err) {
@@ -329,11 +372,11 @@ export default function VerifyEmailForm() {
           </button>
         </div>
 
-        {/* Resend OTP বাটন (৫ মিনিট পার হওয়ার পরেই কেবল রিকোয়েস্ট করা যাবে) */}
+        {/* Resend OTP বাটন (৬০ সেকেন্ড কুলডাউন পার হওয়ার পরেই রিকোয়েস্ট করা যাবে) */}
         <div>
           <button
             type="button"
-            disabled={resending || timeLeft > 0}
+            disabled={resending || resendCooldown > 0}
             onClick={handleResend}
             className="w-full h-11 border border-slate-200 hover:border-slate-300 bg-slate-50/80 hover:bg-slate-100/80 text-slate-700 font-medium text-sm rounded-xl text-center flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -342,8 +385,8 @@ export default function VerifyEmailForm() {
                 <span className="w-3.5 h-3.5 border-2 border-slate-700 border-t-transparent rounded-full animate-spin"></span>
                 <span>Sending Code...</span>
               </>
-            ) : timeLeft > 0 ? (
-              <span>Resend Code in {formatTimer(timeLeft)}</span>
+            ) : resendCooldown > 0 ? (
+              <span>Resend Code in {formatTimer(resendCooldown)}</span>
             ) : (
               <span>Resend OTP Code</span>
             )}

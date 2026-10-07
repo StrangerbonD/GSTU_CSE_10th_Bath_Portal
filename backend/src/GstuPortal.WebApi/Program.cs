@@ -173,6 +173,94 @@ app.MapGet("/api/health", () => Results.Ok(new
     timestamp = DateTime.UtcNow
 })).AllowAnonymous();
 
+// Email diagnostic test endpoint (safe, masked, allows testing Brevo/Resend from Render directly)
+app.MapGet("/api/test-email", async (
+    string? to,
+    IConfiguration configuration,
+    CancellationToken cancellationToken) =>
+{
+    var targetEmail = !string.IsNullOrWhiteSpace(to) ? to.Trim() : "bondhondas20cse016@gmail.com";
+    var result = new Dictionary<string, object?>();
+
+    var brevoKey = Environment.GetEnvironmentVariable("BREVO_API_KEY") ?? configuration["EmailSettings:BrevoApiKey"];
+    var resendKey = Environment.GetEnvironmentVariable("RESEND_API_KEY") ?? configuration["EmailSettings:ResendApiKey"];
+    var rawResendFrom = Environment.GetEnvironmentVariable("RESEND_FROM") ?? configuration["EmailSettings:ResendFrom"];
+    var resendFrom = (!string.IsNullOrWhiteSpace(rawResendFrom) && !rawResendFrom.Contains("@gmail.com", StringComparison.OrdinalIgnoreCase))
+        ? rawResendFrom.Trim()
+        : "GSTU CSE 10th Batch Portal <onboarding@resend.dev>";
+    var smtpHost = Environment.GetEnvironmentVariable("SMTP_HOST") ?? configuration["EmailSettings:SmtpHost"];
+    var smtpUser = Environment.GetEnvironmentVariable("SMTP_USER") ?? configuration["EmailSettings:SmtpUser"];
+    var smtpPort = Environment.GetEnvironmentVariable("SMTP_PORT") ?? configuration["EmailSettings:SmtpPort"];
+    var fromEmail = Environment.GetEnvironmentVariable("FROM_EMAIL") ?? configuration["EmailSettings:FromEmail"];
+
+    result["targetRecipient"] = targetEmail;
+    result["brevoKeyConfigured"] = !string.IsNullOrWhiteSpace(brevoKey);
+    result["resendKeyConfigured"] = !string.IsNullOrWhiteSpace(resendKey);
+    result["resendKeyPrefix"] = !string.IsNullOrWhiteSpace(resendKey) ? (resendKey.Length > 7 ? resendKey[..7] + "..." : "short") : "none";
+    result["resendFromAddress"] = resendFrom;
+    result["fromEmail"] = fromEmail;
+    result["smtpHostConfigured"] = !string.IsNullOrWhiteSpace(smtpHost);
+    result["smtpUser"] = smtpUser;
+    result["smtpPort"] = smtpPort;
+
+    if (!string.IsNullOrWhiteSpace(resendKey))
+    {
+        try
+        {
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resendKey.Trim());
+            var payload = new
+            {
+                from = resendFrom,
+                to = new[] { targetEmail },
+                subject = "GSTU Test Email - Resend API",
+                html = "<p>This is a test verification email from GSTU CSE 10th Batch Portal.</p>"
+            };
+            var content = new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
+            var res = await httpClient.PostAsync("https://api.resend.com/emails", content, cancellationToken);
+            var resBody = await res.Content.ReadAsStringAsync(cancellationToken);
+            result["resendStatusCode"] = (int)res.StatusCode;
+            result["resendResponseBody"] = resBody;
+            result["resendSuccess"] = res.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            result["resendException"] = ex.Message;
+        }
+    }
+
+    if (!string.IsNullOrWhiteSpace(brevoKey))
+    {
+        try
+        {
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            httpClient.DefaultRequestHeaders.Add("api-key", brevoKey.Trim());
+            var senderEmail = Environment.GetEnvironmentVariable("BREVO_SENDER_EMAIL") ??
+                              fromEmail ??
+                              "bondhondas20cse016@gmail.com";
+            var payload = new
+            {
+                sender = new { name = "GSTU CSE 10th Batch Portal", email = senderEmail.Trim() },
+                to = new[] { new { email = targetEmail, name = "Tester" } },
+                subject = "GSTU Test Email - Brevo API",
+                htmlContent = "<p>This is a test verification email from GSTU CSE 10th Batch Portal via Brevo.</p>"
+            };
+            var content = new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
+            var res = await httpClient.PostAsync("https://api.brevo.com/v3/smtp/email", content, cancellationToken);
+            var resBody = await res.Content.ReadAsStringAsync(cancellationToken);
+            result["brevoStatusCode"] = (int)res.StatusCode;
+            result["brevoResponseBody"] = resBody;
+            result["brevoSuccess"] = res.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            result["brevoException"] = ex.Message;
+        }
+    }
+
+    return Results.Ok(result);
+}).AllowAnonymous();
+
 // 6. Database Migration & Seed on Startup
 using (var scope = app.Services.CreateScope())
 {
