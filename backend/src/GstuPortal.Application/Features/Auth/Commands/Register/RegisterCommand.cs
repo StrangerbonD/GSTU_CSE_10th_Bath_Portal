@@ -79,7 +79,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
                 }
             });
 
-            return new AuthResponseDto(string.Empty, string.Empty, existingUser.ToDto(), null);
+            return new AuthResponseDto(string.Empty, string.Empty, existingUser.ToDto(), !_emailService.IsConfigured ? newOtp : null);
         }
 
         var passwordHash = _passwordHasher.HashPassword(request.Password);
@@ -113,7 +113,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
 
         var userDto = user.ToDto();
 
-        // Production security: do NOT issue session tokens or leak OTP until email is verified
-        return new AuthResponseDto(string.Empty, string.Empty, userDto, null);
+        // If email service is not yet configured, provide OTP as fallback so users are not blocked
+        return new AuthResponseDto(string.Empty, string.Empty, userDto, !_emailService.IsConfigured ? otp : null);
     }
 }

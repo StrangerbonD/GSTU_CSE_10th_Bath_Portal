@@ -25,14 +25,19 @@ export default function VerifyEmailForm() {
     const paramEmail = searchParams?.get("email");
     if (paramEmail) {
       setEmail(paramEmail);
-      return;
-    }
-
-    // 2. localStorage থেকে সংরক্ষিত ইমেইল নেওয়া
-    if (typeof window !== "undefined") {
+    } else if (typeof window !== "undefined") {
+      // 2. localStorage থেকে সংরক্ষিত ইমেইল নেওয়া
       const stored = localStorage.getItem("pending_verify_email");
       if (stored) {
         setEmail(stored);
+      }
+    }
+
+    // 3. যদি ব্যাকএন্ড থেকে ওটিপি সংরক্ষিত থাকে (যেমন ইমেইল সার্ভিস এখনো সেটআপ না করা থাকলে)
+    if (typeof window !== "undefined") {
+      const storedOtp = localStorage.getItem("pending_verify_otp");
+      if (storedOtp && storedOtp.trim().length === 6) {
+        setOtp(storedOtp.trim());
       }
     }
   }, [searchParams]);
@@ -54,9 +59,9 @@ export default function VerifyEmailForm() {
         }
       }
 
-      // যদি পূর্বে টাইম সেভ করা না থাকে (যেমন সরাসরি লিংকে এলে), তবে ৫ মিনিটের নতুন এক্সপায়ারি সেভ হবে
+      // যদি পূর্বে টাইম সেভ করা না থাকে, তবে ৬০ সেকেন্ডের নতুন এক্সপায়ারি সেভ হবে
       if (!target) {
-        target = Date.now() + 300 * 1000;
+        target = Date.now() + 60 * 1000;
         localStorage.setItem(storageKey, target.toString());
       }
     }
@@ -198,16 +203,23 @@ export default function VerifyEmailForm() {
         setErrorMessage(result.message || "Failed to resend code. Please try again.");
         return;
       }
+      if (result.otp) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("pending_verify_otp", result.otp);
+        }
+        setOtp(result.otp);
+      }
+
       setResendMessage(result.message || "A new 6-digit verification code has been sent!");
       
-      // নতুন কোড পাঠালে নতুন ৫ মিনিটের timestamp সংরক্ষণ ও টাইমার রিসেট করা
-      const newExpiry = Date.now() + 300 * 1000;
+      // নতুন কোড পাঠালে নতুন ৬০ সেকেন্ডের timestamp সংরক্ষণ ও টাইমার রিসেট করা
+      const newExpiry = Date.now() + 60 * 1000;
       if (typeof window !== "undefined") {
         const normalizedEmail = email.trim().toLowerCase();
         localStorage.setItem(`otp_expires_at_${normalizedEmail}`, newExpiry.toString());
       }
       setTargetTimestamp(newExpiry);
-      setTimeLeft(300);
+      setTimeLeft(60);
 
       setTimeout(() => setResendMessage(""), 5000);
     } catch (err) {
@@ -292,6 +304,11 @@ export default function VerifyEmailForm() {
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
             className="w-full px-4 py-3 bg-slate-50/70 border border-slate-300 rounded-xl text-slate-900 text-2xl tracking-[0.4em] font-mono outline-none focus:bg-white focus:border-emerald-600 focus:ring-3 focus:ring-emerald-500/15 transition text-center shadow-xs"
           />
+          {otp && otp.length === 6 && (
+            <p className="text-[11px] text-emerald-800 bg-emerald-50/80 border border-emerald-200/60 rounded-lg p-2 text-center mt-2 font-medium">
+              Verification code detected: <strong className="font-mono tracking-widest text-emerald-950">{otp}</strong>
+            </p>
+          )}
         </div>
 
         {/* Verify বাটন */}

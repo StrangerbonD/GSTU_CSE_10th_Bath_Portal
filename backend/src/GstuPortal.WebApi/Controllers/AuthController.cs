@@ -74,11 +74,11 @@ public class AuthController : BaseApiController
 
         var result = await Mediator.Send(new RegisterCommand(username, fullName, email, password, request.StudentId, deviceInfo, ipAddress));
 
-        // Production security: do NOT leak OTP in response and do NOT set cookie before verification
         return Ok(new
         {
             success = true,
             email = result.User?.Email ?? email,
+            otp = result.Otp,
             message = "Account created successfully. A 6-digit verification code has been sent to your email."
         });
     }

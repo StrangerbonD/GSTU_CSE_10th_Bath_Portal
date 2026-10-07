@@ -19,6 +19,22 @@ public class EmailService : IEmailService
         _configuration = configuration;
     }
 
+    public bool IsConfigured
+    {
+        get
+        {
+            var brevoApiKey = Environment.GetEnvironmentVariable("BREVO_API_KEY") ?? _configuration["EmailSettings:BrevoApiKey"];
+            var resendApiKey = Environment.GetEnvironmentVariable("RESEND_API_KEY") ?? _configuration["EmailSettings:ResendApiKey"];
+            var smtpHost = Environment.GetEnvironmentVariable("SMTP_HOST") ?? _configuration["EmailSettings:SmtpHost"];
+            var smtpUser = Environment.GetEnvironmentVariable("SMTP_USER") ?? _configuration["EmailSettings:SmtpUser"];
+            var smtpPass = Environment.GetEnvironmentVariable("SMTP_PASS") ?? _configuration["EmailSettings:SmtpPass"];
+
+            return !string.IsNullOrWhiteSpace(brevoApiKey) ||
+                   !string.IsNullOrWhiteSpace(resendApiKey) ||
+                   (!string.IsNullOrWhiteSpace(smtpHost) && !string.IsNullOrWhiteSpace(smtpUser) && !string.IsNullOrWhiteSpace(smtpPass));
+        }
+    }
+
     public async Task SendOtpEmailAsync(string toEmail, string fullName, string otp, CancellationToken cancellationToken = default)
     {
         // 1. Always log OTP to server console so the admin/user can always find it in Render logs
@@ -57,23 +73,63 @@ public class EmailService : IEmailService
             
             <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 0;">
                 Best regards,<br/>
-                <strong>Bondhon</strong><br/>
-                <span style="color: #64748b; font-size: 12px;">GSTU CSE 10th Batch</span>
+                <strong>GSTU CSE 10th Batch</strong><br/>
+                <span style="color: #64748b; font-size: 12px;">Department of Computer Science & Engineering</span>
             </p>
         </div>
         """;
 
-        // 2. High-speed HTTP API (Resend / SendGrid / Brevo) - Uses HTTPS port 443 which is NEVER blocked by Render
+        // 2. High-speed HTTP API via Brevo (Sendinblue) - 300 free emails/day, no credit card, HTTPS port 443
+        var brevoApiKey = Environment.GetEnvironmentVariable("BREVO_API_KEY") ?? _configuration["EmailSettings:BrevoApiKey"];
+        var senderEmail = Environment.GetEnvironmentVariable("BREVO_SENDER_EMAIL") ??
+                          Environment.GetEnvironmentVariable("FROM_EMAIL") ??
+                          _configuration["EmailSettings:FromEmail"] ??
+                          "bondhondas20cse016@gmail.com";
+
+        if (!string.IsNullOrWhiteSpace(brevoApiKey))
+        {
+            try
+            {
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
+                httpClient.DefaultRequestHeaders.Add("api-key", brevoApiKey.Trim());
+                var payload = new
+                {
+                    sender = new { name = "GSTU CSE 10th Batch Portal", email = senderEmail.Trim() },
+                    to = new[] { new { email = toEmail.Trim(), name = safeFullName } },
+                    subject = "GSTU CSE 10th Batch - Email Verification Code",
+                    htmlContent = htmlBody
+                };
+                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                var res = await httpClient.PostAsync("https://api.brevo.com/v3/smtp/email", content, cancellationToken);
+                if (res.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Verification email dispatched successfully via Brevo API to {Email}", toEmail);
+                    return;
+                }
+                else
+                {
+                    var err = await res.Content.ReadAsStringAsync(cancellationToken);
+                    _logger.LogWarning("Brevo API warning: {StatusCode} {Error}", res.StatusCode, err);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Brevo API attempt failed: {Message}", ex.Message);
+            }
+        }
+
+        // 3. High-speed HTTP API via Resend - Uses HTTPS port 443 which is NEVER blocked by Render
         var resendApiKey = Environment.GetEnvironmentVariable("RESEND_API_KEY") ?? _configuration["EmailSettings:ResendApiKey"];
         if (!string.IsNullOrWhiteSpace(resendApiKey))
         {
             try
             {
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
                 httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resendApiKey.Trim());
+                var resendFrom = Environment.GetEnvironmentVariable("RESEND_FROM") ?? "GSTU CSE 10th Batch Portal <onboarding@resend.dev>";
                 var payload = new
                 {
-                    from = "GSTU CSE 10th Batch Portal <onboarding@resend.dev>",
+                    from = resendFrom,
                     to = new[] { toEmail.Trim() },
                     subject = "GSTU CSE 10th Batch - Email Verification Code",
                     html = htmlBody
@@ -97,14 +153,14 @@ public class EmailService : IEmailService
             }
         }
 
-        // 3. Fallback: SMTP with a strict 4-second timeout to prevent server thread hang if outbound SMTP is blocked
+        // 4. Fallback: SMTP with a strict 4-second timeout to prevent server thread hang if outbound SMTP is blocked
         var smtpHost = Environment.GetEnvironmentVariable("SMTP_HOST") ?? _configuration["EmailSettings:SmtpHost"];
         var smtpPort = int.TryParse(Environment.GetEnvironmentVariable("SMTP_PORT") ?? _configuration["EmailSettings:SmtpPort"], out var p) ? p : 587;
         var smtpUser = Environment.GetEnvironmentVariable("SMTP_USER") ?? _configuration["EmailSettings:SmtpUser"];
         var smtpPass = Environment.GetEnvironmentVariable("SMTP_PASS") ?? _configuration["EmailSettings:SmtpPass"];
         var fromEmail = Environment.GetEnvironmentVariable("FROM_EMAIL") ?? _configuration["EmailSettings:FromEmail"] ?? "no-reply@gstu.ac.bd";
 
-        if (!string.IsNullOrWhiteSpace(smtpHost) && !string.IsNullOrWhiteSpace(smtpUser))
+        if (!string.IsNullOrWhiteSpace(smtpHost) && !string.IsNullOrWhiteSpace(smtpUser) && !string.IsNullOrWhiteSpace(smtpPass))
         {
             try
             {

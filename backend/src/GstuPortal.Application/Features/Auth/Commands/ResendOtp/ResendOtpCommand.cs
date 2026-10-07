@@ -37,19 +37,19 @@ public class ResendOtpCommandHandler : IRequestHandler<ResendOtpCommand, ResendO
             return new ResendOtpResult(false, "This email is already verified. You can log in directly.");
         }
 
-        // 5-minute cooldown check: User can only request a new code after 5 minutes have elapsed
-        if (user.EmailVerificationOtpExpiresAt.HasValue && user.EmailVerificationOtpExpiresAt.Value > DateTime.UtcNow)
+        // 60-second cooldown check: User can only request a new code once per minute
+        if (user.UpdatedAt.HasValue && user.UpdatedAt.Value.AddSeconds(60) > DateTime.UtcNow)
         {
-            var remaining = user.EmailVerificationOtpExpiresAt.Value - DateTime.UtcNow;
-            var minutes = (int)remaining.TotalMinutes;
-            var seconds = remaining.Seconds;
-            var timeFormatted = minutes > 0 ? $"{minutes}m {seconds}s" : $"{seconds}s";
-            return new ResendOtpResult(false, $"A verification code was already sent. Please wait {timeFormatted} before requesting a new code.");
+            var remaining = (int)(user.UpdatedAt.Value.AddSeconds(60) - DateTime.UtcNow).TotalSeconds;
+            if (remaining > 0)
+            {
+                return new ResendOtpResult(false, $"Please wait {remaining} second(s) before requesting a new verification code.");
+            }
         }
 
-        // Generate cryptographic 6-digit OTP (valid for 5 minutes)
+        // Generate cryptographic 6-digit OTP (valid for 15 minutes)
         var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-        var expiresAt = DateTime.UtcNow.AddMinutes(5);
+        var expiresAt = DateTime.UtcNow.AddMinutes(15);
 
         user.SetVerificationOtp(otp, expiresAt);
         await _context.SaveChangesAsync(cancellationToken);
@@ -66,6 +66,6 @@ public class ResendOtpCommandHandler : IRequestHandler<ResendOtpCommand, ResendO
             }
         });
 
-        return new ResendOtpResult(true, "A new 6-digit verification code has been sent to your email.");
+        return new ResendOtpResult(true, "A new 6-digit verification code has been sent to your email.", !_emailService.IsConfigured ? otp : null);
     }
 }
