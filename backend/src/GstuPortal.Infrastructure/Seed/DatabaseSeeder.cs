@@ -39,16 +39,20 @@ public static class DatabaseSeeder
 
             if (isDev)
             {
-                var demoStudent = new User(
-                    username: "bondhon",
-                    fullName: "Bondhon Saha",
-                    email: "bondhon@gstu.ac.bd",
-                    passwordHash: passwordHasher.HashPassword("Bondhon@1234"),
-                    role: UserRole.Student,
-                    studentId: "19CSE024");
-                demoStudent.ApproveClaim();
-                demoStudent.MarkEmailAsVerified();
-                context.Users.Add(demoStudent);
+                var devStudentPassword = Environment.GetEnvironmentVariable("DEV_STUDENT_PASSWORD");
+                if (!string.IsNullOrWhiteSpace(devStudentPassword))
+                {
+                    var demoStudent = new User(
+                        username: "bondhon",
+                        fullName: "Bondhon Saha",
+                        email: "bondhon@gstu.ac.bd",
+                        passwordHash: passwordHasher.HashPassword(devStudentPassword),
+                        role: UserRole.Student,
+                        studentId: "19CSE024");
+                    demoStudent.ApproveClaim();
+                    demoStudent.MarkEmailAsVerified();
+                    context.Users.Add(demoStudent);
+                }
             }
 
             await context.SaveChangesAsync();
