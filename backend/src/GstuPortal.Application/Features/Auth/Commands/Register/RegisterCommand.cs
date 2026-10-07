@@ -47,13 +47,39 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
         var username = request.Username.Trim();
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var exists = await _context.Users.AnyAsync(
+        var existingUser = await _context.Users.FirstOrDefaultAsync(
             u => u.Username.ToLower() == username.ToLower() || u.Email.ToLower() == email,
             cancellationToken);
 
-        if (exists)
+        if (existingUser != null)
         {
-            throw new InvalidOperationException("A user with this username or email already exists.");
+            if (existingUser.IsEmailVerified)
+            {
+                throw new InvalidOperationException("A user with this username or email already exists. Please log in.");
+            }
+
+            // User registered previously but has not verified their email yet.
+            // Safely refresh their password and issue a fresh 6-digit OTP so they are not locked out!
+            var newPasswordHash = _passwordHasher.HashPassword(request.Password);
+            existingUser.ChangePassword(newPasswordHash);
+
+            var newOtp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+            existingUser.SetVerificationOtp(newOtp, DateTime.UtcNow.AddMinutes(15));
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendOtpEmailAsync(existingUser.Email, existingUser.FullName, newOtp, CancellationToken.None);
+                }
+                catch
+                {
+                    // Handled inside EmailService
+                }
+            });
+
+            return new AuthResponseDto(string.Empty, string.Empty, existingUser.ToDto(), null);
         }
 
         var passwordHash = _passwordHasher.HashPassword(request.Password);
@@ -65,15 +91,25 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
             role: UserRole.User,
             studentId: request.StudentId);
 
-        // Generate 6-digit verification OTP (valid for 5 minutes)
+        // Generate 6-digit verification OTP (valid for 15 minutes)
         var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-        user.SetVerificationOtp(otp, DateTime.UtcNow.AddMinutes(5));
+        user.SetVerificationOtp(otp, DateTime.UtcNow.AddMinutes(15));
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Send OTP email
-        await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otp, cancellationToken);
+        // Send OTP email in the background so registration responds immediately
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otp, CancellationToken.None);
+            }
+            catch
+            {
+                // Handled inside EmailService
+            }
+        });
 
         var userDto = user.ToDto();
 

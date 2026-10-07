@@ -54,7 +54,17 @@ public class ResendOtpCommandHandler : IRequestHandler<ResendOtpCommand, ResendO
         user.SetVerificationOtp(otp, expiresAt);
         await _context.SaveChangesAsync(cancellationToken);
 
-        await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otp, cancellationToken);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otp, CancellationToken.None);
+            }
+            catch
+            {
+                // Handled inside EmailService
+            }
+        });
 
         return new ResendOtpResult(true, "A new 6-digit verification code has been sent to your email.");
     }
